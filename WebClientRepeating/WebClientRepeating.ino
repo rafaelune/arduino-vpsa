@@ -16,6 +16,7 @@ const unsigned long postingInterval = 10*1000;
 void setup() {
   Serial.begin(9600);
   delay(1000);
+  
   Ethernet.begin(mac);
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
