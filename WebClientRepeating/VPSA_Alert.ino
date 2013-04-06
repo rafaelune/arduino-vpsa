@@ -9,12 +9,22 @@ EthernetClient client;
 IPAddress server(10,201,1,11);
 
 unsigned long lastConnectionTime = 0;
+unsigned long lastConnectionTimeBuzzer = 0;
 boolean lastConnected = false;
 String jsonRetorno = "";
 const unsigned long postingInterval = 10*1000;
+String cor = "blue";
+
+boolean tocarAlarme = false;
+
+const int buzzerPin =  9;
+const int giroflexPin = 8;
 
 void setup() {
-  Serial.begin(9600);
+  pinMode(buzzerPin, OUTPUT);  
+  pinMode(giroflexPin, OUTPUT); 
+  
+  Serial.begin(115200);
   delay(1000);
   Ethernet.begin(mac);
   Serial.print("My IP address: ");
@@ -32,15 +42,17 @@ void loop() {
     
     int posicaoSeparador = jsonRetorno.indexOf(":\"");
 
-    String cor = jsonRetorno.substring(jsonRetorno.indexOf("\"}", posicaoSeparador), posicaoSeparador + 2);
+    cor = jsonRetorno.substring(jsonRetorno.indexOf("\"}", posicaoSeparador), posicaoSeparador + 2);
     
     if(cor != "blue")
     {
-      Serial.println("Ta com erro");    
+      Serial.println("Ta com erro");
+      tocarAlarme = true;
     }
     else
     {
       Serial.println("Ta OK");
+      tocarAlarme = false;
     }
     
     Serial.println(cor);
@@ -52,7 +64,27 @@ void loop() {
   if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
     httpRequest();
   }
-
+  
+  if (tocarAlarme) {
+    digitalWrite(giroflexPin, HIGH);
+    const int delayNota = 1000;
+    const int delayPausa = delayNota * 2;
+    const int nota = 261;
+    tone(buzzerPin, nota, delayNota);
+    delay(delayPausa);
+     
+    tone(buzzerPin, nota, delayNota);
+    delay(delayPausa);
+    
+    tone(buzzerPin, nota, delayNota);
+    delay(delayPausa);
+    
+    tone(buzzerPin, nota, delayNota);
+    
+    tocarAlarme = false;
+    digitalWrite(giroflexPin, LOW);
+  }
+  
   lastConnected = client.connected();
 }
 
