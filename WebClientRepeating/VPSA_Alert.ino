@@ -12,13 +12,21 @@ unsigned long lastConnectionTime = 0;
 unsigned long lastConnectionTimeBuzzer = 0;
 boolean lastConnected = false;
 String jsonRetorno = "";
-const unsigned long postingInterval = 10*1000;
+const unsigned long postingInterval = 30*1000;
 String cor = "blue";
-
-boolean tocarAlarme = false;
 
 const int buzzerPin =  9;
 const int giroflexPin = 8;
+
+const int COMPRAS = 0;
+const int ESTOQUE = 1;
+const int PDV = 2;
+const int VPSA = 3;
+
+String projetos[] = { "compras-java", "estoque-java-integration-test", "offlinemanager", "vpsa-java-integration-test" };
+int bipes[] = { 1, 2, 3, 4 };
+int indexProjetoAtual = -1;
+int retryCount = 0;
 
 void setup() {
   pinMode(buzzerPin, OUTPUT);  
@@ -38,8 +46,6 @@ void loop() {
   }
 
   if (!client.connected() && lastConnected) {
-    Serial.println();
-    
     int posicaoSeparador = jsonRetorno.indexOf(":\"");
 
     cor = jsonRetorno.substring(jsonRetorno.indexOf("\"}", posicaoSeparador), posicaoSeparador + 2);
@@ -47,12 +53,11 @@ void loop() {
     if(cor != "blue")
     {
       Serial.println("Ta com erro");
-      tocarAlarme = true;
+      tocarAlarme();
     }
     else
     {
       Serial.println("Ta OK");
-      tocarAlarme = false;
     }
     
     Serial.println(cor);
@@ -62,45 +67,56 @@ void loop() {
   }
 
   if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
+    if (indexProjetoAtual == VPSA) {
+      indexProjetoAtual = COMPRAS;
+    } else {
+      indexProjetoAtual++;
+    }
     httpRequest();
-  }
-  
-  if (tocarAlarme) {
-    digitalWrite(giroflexPin, HIGH);
-    const int delayNota = 1000;
-    const int delayPausa = delayNota * 2;
-    const int nota = 261;
-    tone(buzzerPin, nota, delayNota);
-    delay(delayPausa);
-     
-    tone(buzzerPin, nota, delayNota);
-    delay(delayPausa);
-    
-    tone(buzzerPin, nota, delayNota);
-    delay(delayPausa);
-    
-    tone(buzzerPin, nota, delayNota);
-    
-    tocarAlarme = false;
-    digitalWrite(giroflexPin, LOW);
   }
   
   lastConnected = client.connected();
 }
 
-void httpRequest() {
+void tocarAlarme() {
+    digitalWrite(giroflexPin, HIGH);
+  
+    const int delayNota = 500;
+    const int delayPausa = delayNota * 2;
+    const int nota = 261;
+    
+    for (int intervalo = 0; intervalo < 3; intervalo++) {
+      for (int vezes = 0; vezes < bipes[indexProjetoAtual]; vezes++) {
+        tone(buzzerPin, nota, delayNota);
+        delay(delayPausa);
+      }
+      delay(4000);
+    }
+    
+    digitalWrite(giroflexPin, LOW);
+}
 
+void httpRequest() {
   if (client.connect(server, 9080)) {
     Serial.println("connecting...");
 
-    client.println("GET /hudson/job/commons/api/json?tree=color HTTP/1.0");
+    client.println("GET /hudson/job/" + projetos[indexProjetoAtual] + "/api/json?tree=color HTTP/1.0");
     client.println();
 
+    Serial.println();
+    Serial.println("Projeto: " + projetos[indexProjetoAtual]);
     lastConnectionTime = millis();
   } 
   else {
     Serial.println("connection failed");
     Serial.println("disconnecting.");
     client.stop();
+    
+    if (retryCount < 3) {
+      retryCount++;
+      httpRequest(); 
+    } else {
+      retryCount = 0;  
+    }
   }
 }
