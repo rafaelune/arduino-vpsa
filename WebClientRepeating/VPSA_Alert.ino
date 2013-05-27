@@ -12,14 +12,16 @@ IPAddress shieldIp(192,168,100,50);
 
 unsigned long lastConnectionTime = 0;
 unsigned long lastConnectionTimeBuzzer = 0;
+unsigned long counter = 0;
 boolean lastConnected = false;
 String jsonRetorno = "";
 // Intervalo de consulta
 const unsigned long postingInterval = 225L*1000L;
 String cor = "blue";
 
-const String STATUS_TESTES_INTEGRACAO_QUEBRADOS = "red";
-const String STATUS_TESTES_UNITARIOS_QUEBRADOS = "yellow";
+const String INTEGRATION_TESTS_BROKEN_STATUS = "red";
+const String UNIT_TESTS_BROKEN_STATUS = "yellow";
+const int LED_PIN = 7;
 const int BUZZER_PIN =  9;
 const int GIROFLEX_PIN = 8;
 const int COMPRAS = 0;
@@ -32,9 +34,9 @@ String projetos[] = {
 int bipes[] = { 
   1, 2, 3, 4 };
 int indexProjetoAtual = -1;
-int retryCount = 0;
 
 void setup() {
+  pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);  
   pinMode(GIROFLEX_PIN, OUTPUT); 
 
@@ -49,7 +51,7 @@ void setup() {
 
 void loop() {
   checkProjects();
-
+  
   listenIncomingClients();
 }
 
@@ -59,12 +61,12 @@ void checkProjects() {
     jsonRetorno += c;
   }
 
-  if (!client.connected() && lastConnected) {
+  if (!client.connected() && lastConnected) {    
     int posicaoSeparador = jsonRetorno.indexOf(":\"");
 
     cor = jsonRetorno.substring(jsonRetorno.indexOf("\"}", posicaoSeparador), posicaoSeparador + 2);
 
-    if(cor == STATUS_TESTES_INTEGRACAO_QUEBRADOS || cor == STATUS_TESTES_UNITARIOS_QUEBRADOS)
+    if(cor == INTEGRATION_TESTS_BROKEN_STATUS || cor == UNIT_TESTS_BROKEN_STATUS)
     {
       tocarAlarme();
     }
@@ -73,9 +75,7 @@ void checkProjects() {
     //Serial.println("disconnecting.");
     client.stop();
     jsonRetorno = "";
-  }
-
-  if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
+  } else if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
     if (indexProjetoAtual == VPSA) {
       indexProjetoAtual = COMPRAS;
     } 
@@ -83,6 +83,12 @@ void checkProjects() {
       indexProjetoAtual++;
     }
     httpRequest();
+  } else {
+    counter++;
+    if (counter >= 10000) {
+      counter = 0;
+      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    }
   }
 
   lastConnected = client.connected();
@@ -94,7 +100,7 @@ void listenIncomingClients() {
   if (client) {
     //Serial.println("new client");
     
-    while(client.connected()) {
+    while (client.connected()) {      
       if (client.available()) {
         char c = client.read();
         //Serial.write(c);
@@ -139,7 +145,7 @@ void listenIncomingClients() {
           client.print("Leitura em: ");
           client.print((postingInterval - (millis() - lastConnectionTime)) / 1000L);
           client.println(" s.</p>");
-          client.println("<p>O 'Berduino' alerta quando os testes do COMPRAS-JAVA (1 bipe), ESTOQUE-JAVA-INTEGRATION-TEST (2 bipes), OFFLINEMANAGER (3 bipes) e VPSA-JAVA-INTEGRATION-TEST (4 bipes) falharam no Jenkins!</p>");
+          client.println("<p>O 'Berduino' alerta quando os testes do COMPRAS-JAVA-INTEGRATION-TEST (1 bipe), ESTOQUE-JAVA-INTEGRATION-TEST (2 bipes), OFFLINEMANAGER (3 bipes) e VPSA-JAVA-INTEGRATION-TEST (4 bipes) falharam no Jenkins!</p>");
           client.println("</body>");
           client.println("</html>");
           
@@ -182,18 +188,11 @@ void httpRequest() {
     //Serial.println();
     //Serial.println("Projeto: " + projetos[indexProjetoAtual]);
     lastConnectionTime = millis();
-  } 
-  else {
+  } else {
     //Serial.println("connection failed");
     //Serial.println("disconnecting.");
     client.stop();
-
-    if (retryCount < 3) {
-      retryCount++;
-      httpRequest(); 
-    } 
-    else {
-      retryCount = 0;  
-    }
+    
+    tone(BUZZER_PIN, 440, 250);
   }
 }
