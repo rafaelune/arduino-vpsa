@@ -1,5 +1,6 @@
 arduino-vpsa / VPSA Alerta
 ==========================
+[![endorse](https://api.coderwall.com/rafaelune/endorsecount.png)](https://coderwall.com/rafaelune)
 
 Sirene de alerta que é disparada quando os testes dos projetos no Jenkins estão quebrados.
 
